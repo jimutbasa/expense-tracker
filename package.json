@@ -1,0 +1,12 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "description": "Full-stack expense tracker — Express backend + React frontend",
+  "private": true,
+  "scripts": {
+    "start:server": "cd server && node index.js",
+    "start:client": "cd client && npm run dev",
+    "dev:server": "cd server && node --watch index.js",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  }
+}
