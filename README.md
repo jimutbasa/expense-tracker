@@ -7,6 +7,7 @@ A full-stack web application for recording and reviewing personal spending. Add 
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [Architecture Diagram](#architecture-diagram)
 - [Tech Stack](#tech-stack)
 - [How to Run](#how-to-run)
 - [API Reference](#api-reference)
@@ -27,6 +28,72 @@ Expense Tracker lets you:
 - **Persist data** across page refreshes — everything is stored in a SQLite database
 
 The entire app lives on one page. No login, no editing, no charts — just fast, simple expense recording.
+
+---
+
+## Architecture Diagram
+
+```mermaid
+flowchart TD
+    User(["🧑 User\n(Browser)"])
+
+    subgraph Client["Frontend — React + Vite  (:5173)"]
+        direction TB
+        App["App.jsx\n─────────────────\nOwns all state:\nexpenses, activeCategory,\nloading, error"]
+
+        subgraph Components["Components"]
+            direction LR
+            AEF["AddExpenseForm"]
+            CF["CategoryFilter"]
+            EL["ExpenseList"]
+            TD["TotalDisplay"]
+        end
+
+        APILayer["api/expenses.js\n─────────────────\ngetExpenses()\ncreatExpense()\ndeleteExpense()"]
+
+        App <-->|"props / callbacks"| Components
+        App -->|"calls"| APILayer
+    end
+
+    subgraph Proxy["Vite Dev Proxy"]
+        P["/api/* → :3001"]
+    end
+
+    subgraph Server["Backend — Express  (:3001)"]
+        direction TB
+        MW["Middleware\n─────────────────\ncors · json · validate"]
+        
+        subgraph Routes["routes/expenses.js"]
+            direction LR
+            R1["GET /api/expenses\n?category="]
+            R2["POST /api/expenses"]
+            R3["DELETE /api/expenses/:id"]
+        end
+
+        DB[("SQLite\n─────────────\nexpenses.db\nbetter-sqlite3")]
+
+        MW --> Routes
+        Routes <-->|"sync queries"| DB
+    end
+
+    User -->|"interacts with"| App
+    APILayer -->|"axios HTTP"| Proxy
+    Proxy -->|"forwarded request"| MW
+    Server -->|"JSON response"| Proxy
+    Proxy -->|"JSON response"| APILayer
+```
+
+### How the pieces fit together
+
+| Layer | Responsibility |
+|---|---|
+| **React components** | Render UI, own only local form state, receive all data via props from `App.jsx` |
+| **`App.jsx`** | Single source of truth for `expenses[]` state; computes filtered list and total via `useMemo`; handles add/delete without re-fetching |
+| **`api/expenses.js`** | Thin axios wrappers — all calls use relative `/api/*` paths, never a hardcoded hostname |
+| **Vite proxy** | Rewrites `/api/*` → `http://localhost:3001` in dev so the frontend never needs to know the backend port |
+| **Express middleware** | CORS, JSON body parsing, and request validation run before every route handler |
+| **`routes/expenses.js`** | Stateless route handlers — read/write SQLite, map `snake_case` DB rows to `camelCase` API responses |
+| **SQLite (`better-sqlite3`)** | Synchronous, file-backed database; enforces category enum and `amount > 0` via `CHECK` constraints |
 
 ---
 
